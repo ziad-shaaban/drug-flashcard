@@ -8,8 +8,7 @@
     <meta name="description" content="Offline drug brand-to-generic flashcard app">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:;">
     <title>DrugFlash</title>
-    <link rel="icon" type="image/svg+xml"
-    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230D9488'/%3E%3Crect x='25' y='35' width='50' height='30' rx='15' fill='white' transform='rotate(-30 50 50)'/%3E%3C/svg%3E">
+    <link rel="icon" type="image/png" id="favicon">
     <link rel="manifest" id="manifest-link">
     <link
     href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Space+Grotesk:wght@400;500;600;700&display=swap"
@@ -2020,11 +2019,7 @@
         <!-- ===== HEADER ===== -->
         <header id="app-header">
             <div class="header-left">
-                <svg class="logo" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="100" height="100" rx="20" fill="#0D9488" />
-                    <rect x="25" y="35" width="50" height="30" rx="15" fill="white" transform="rotate(-30 50 50)" />
-                    <rect x="25" y="35" width="50" height="30" rx="15" fill="white" transform="rotate(30 50 50)" opacity="0.5" />
-                </svg>
+                <img class="logo" id="app-logo" alt="DrugFlash" width="32" height="32">
                 <h1>DrugFlash</h1>
             </div>
             <div class="header-right">
@@ -3001,7 +2996,137 @@
         });
 
         /* ============================================================
-           PWA
+           PWA ICON GENERATION — canvas-based PNG (fixes Chrome badge)
+           ============================================================ */
+        function generateIconPng(size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            // --- rounded rectangle background ---
+            const r = size * 0.18;
+            const w = size,
+                h = size;
+            ctx.beginPath();
+            ctx.moveTo(r, 0);
+            ctx.lineTo(w - r, 0);
+            ctx.quadraticCurveTo(w, 0, w, r);
+            ctx.lineTo(w, h - r);
+            ctx.quadraticCurveTo(w, h, w - r, h);
+            ctx.lineTo(r, h);
+            ctx.quadraticCurveTo(0, h, 0, h - r);
+            ctx.lineTo(0, r);
+            ctx.quadraticCurveTo(0, 0, r, 0);
+            ctx.closePath();
+            ctx.fillStyle = '#0D9488';
+            ctx.fill();
+            // subtle inner glow
+            const grad = ctx.createRadialGradient(size * 0.3, size * 0.3, 0, size * 0.5, size * 0.5, size * 0.8);
+            grad.addColorStop(0, 'rgba(255,255,255,0.06)');
+            grad.addColorStop(1, 'rgba(0,0,0,0.02)');
+            ctx.fillStyle = grad;
+            ctx.fill();
+
+            // --- pill shape (rotated) ---
+            const pw = size * 0.46;
+            const ph = size * 0.26;
+            const cx = size / 2,
+                cy = size / 2;
+
+            // first pill (main)
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(-28 * Math.PI / 180);
+            ctx.beginPath();
+            // rounded rect for pill
+            const rx = ph / 2;
+            const px = -pw / 2,
+                py = -ph / 2;
+            ctx.moveTo(px + rx, py);
+            ctx.lineTo(px + pw - rx, py);
+            ctx.quadraticCurveTo(px + pw, py, px + pw, py + rx);
+            ctx.lineTo(px + pw, py + ph - rx);
+            ctx.quadraticCurveTo(px + pw, py + ph, px + pw - rx, py + ph);
+            ctx.lineTo(px + rx, py + ph);
+            ctx.quadraticCurveTo(px, py + ph, px, py + ph - rx);
+            ctx.lineTo(px, py + rx);
+            ctx.quadraticCurveTo(px, py, px + rx, py);
+            ctx.closePath();
+            ctx.fillStyle = 'white';
+            ctx.shadowColor = 'rgba(0,0,0,0.15)';
+            ctx.shadowBlur = size * 0.04;
+            ctx.fill();
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+            ctx.restore();
+
+            // second pill (transparent overlay)
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(28 * Math.PI / 180);
+            ctx.globalAlpha = 0.3;
+            ctx.beginPath();
+            const px2 = -pw / 2,
+                py2 = -ph / 2;
+            ctx.moveTo(px2 + rx, py2);
+            ctx.lineTo(px2 + pw - rx, py2);
+            ctx.quadraticCurveTo(px2 + pw, py2, px2 + pw, py2 + rx);
+            ctx.lineTo(px2 + pw, py2 + ph - rx);
+            ctx.quadraticCurveTo(px2 + pw, py2 + ph, px2 + pw - rx, py2 + ph);
+            ctx.lineTo(px2 + rx, py2 + ph);
+            ctx.quadraticCurveTo(px2, py2 + ph, px2, py2 + ph - rx);
+            ctx.lineTo(px2, py2 + rx);
+            ctx.quadraticCurveTo(px2, py2, px2 + rx, py2);
+            ctx.closePath();
+            ctx.fillStyle = 'white';
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            ctx.restore();
+
+            // small highlight dot
+            ctx.beginPath();
+            ctx.arc(size * 0.28, size * 0.28, size * 0.04, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,0.2)';
+            ctx.fill();
+
+            return canvas.toDataURL('image/png');
+        }
+
+        /* ============================================================
+           PWA — manifest with PNG icons, service worker
+           ============================================================ */
+        function registerManifest() {
+            const sizes = [192, 512];
+            const icons = sizes.map(s => ({
+                src: generateIconPng(s),
+                sizes: `${s}x${s}`,
+                type: 'image/png',
+                purpose: 'any maskable'
+            }));
+
+            const manifest = {
+                name: 'DrugFlash - Drug Name Flashcards',
+                short_name: 'DrugFlash',
+                description: 'Study drug brand and generic names with flashcards',
+                start_url: window.location.href.split('?')[0],
+                display: 'standalone',
+                background_color: '#0B1120',
+                theme_color: '#0D9488',
+                orientation: 'portrait-primary',
+                categories: ['medical', 'education'],
+                icons: icons
+            };
+
+            try {
+                const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                document.getElementById('manifest-link').href = url;
+            } catch (e) {}
+        }
+
+        /* ============================================================
+           PWA — service worker
            ============================================================ */
         function registerServiceWorker() {
             if (!('serviceWorker' in navigator)) return;
@@ -3039,33 +3164,9 @@
             } catch (e) {}
         }
 
-        function registerManifest() {
-            const iconSvg = (size) => {
-                const svg =
-                    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" rx="${Math.round(size * 0.2)}" fill="#0D9488"/><rect x="${Math.round(size * 0.25)}" y="${Math.round(size * 0.35)}" width="${Math.round(size * 0.5)}" height="${Math.round(size * 0.3)}" rx="${Math.round(size * 0.15)}" fill="white" transform="rotate(-30 ${size / 2} ${size / 2})"/><rect x="${Math.round(size * 0.25)}" y="${Math.round(size * 0.35)}" width="${Math.round(size * 0.5)}" height="${Math.round(size * 0.3)}" rx="${Math.round(size * 0.15)}" fill="white" transform="rotate(30 ${size / 2} ${size / 2})" opacity="0.6"/></svg>`;
-                return `data:image/svg+xml,${encodeURIComponent(svg)}`;
-            };
-            const manifest = {
-                name: 'DrugFlash - Drug Name Flashcards',
-                short_name: 'DrugFlash',
-                description: 'Study drug brand and generic names with flashcards',
-                start_url: window.location.href.split('?')[0],
-                display: 'standalone',
-                background_color: '#0B1120',
-                theme_color: '#0D9488',
-                orientation: 'portrait-primary',
-                categories: ['medical', 'education'],
-                icons: [
-                    { src: iconSvg(192), sizes: '192x192', type: 'image/svg+xml', purpose: 'any maskable' },
-                    { src: iconSvg(512), sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' }
-                ]
-            };
-            try {
-                const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-                document.getElementById('manifest-link').href = URL.createObjectURL(blob);
-            } catch (e) {}
-        }
-
+        /* ============================================================
+           PWA — install prompt
+           ============================================================ */
         let deferredPrompt = null;
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
@@ -3094,11 +3195,22 @@
         function init() {
             loadSettings();
             loadProgress();
+
+            // Generate and set favicon + app logo
+            const favicon = document.getElementById('favicon');
+            const logo = document.getElementById('app-logo');
+            const icon64 = generateIconPng(64);
+            const icon32 = generateIconPng(32);
+            if (favicon) favicon.href = icon64;
+            if (logo) logo.src = icon32;
+
             registerManifest();
             registerServiceWorker();
+
             document.documentElement.classList.toggle('dark', state.darkMode);
             document.getElementById('theme-icon-sun').style.display = state.darkMode ? 'block' : 'none';
             document.getElementById('theme-icon-moon').style.display = state.darkMode ? 'none' : 'block';
+
             render();
         }
 
